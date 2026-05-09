@@ -1,114 +1,334 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import ReactDOM from "react-dom/client";
+import "./global.css";
 
 function App() {
-  const [receipt, setReceipt] = useState(null);
-  const [loading, setLoading] = useState(false);
+    const [receipt, setReceipt] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [imagePreview, setImagePreview] = useState(null);
 
-  async function uploadFile(e) {
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append("receipt", file);
+    const [savedReceipts, setSavedReceipts] = useState([]);
+    const [selectedReceipt, setSelectedReceipt] = useState(null);
+    const [showToast, setShowToast] = useState(false);
 
-    setLoading(true);
+    useEffect(() => {
+        fetchReceipts();
+    }, []);
 
-    const res = await fetch("http://localhost:3001/parse-receipt", {
-      method: "POST",
-      body: formData
-    });
+    async function fetchReceipts() {
+        const res = await fetch("http://localhost:3001/receipts");
+        const data = await res.json();
 
-    const data = await res.json();
-    setReceipt(data);
-    setLoading(false);
-  }
+        setSavedReceipts(data);
+    }
 
-  async function saveReceipt() {
-    await fetch("http://localhost:3001/save-receipt", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(receipt)
-    });
+    async function uploadFile(e) {
+        setSelectedReceipt(null);
 
-    alert("Saved!");
-  }
+        const file = e.target.files[0];
 
-  function updateItem(index, key, value) {
-    const updated = { ...receipt };
-    updated.items[index][key] = value;
-    setReceipt(updated);
-  }
+        if (!file) return;
 
-  return (
-    <div style={{ padding: 24, fontFamily: "Arial" }}>
-      <h1>Receipt Parser</h1>
+        setImagePreview(URL.createObjectURL(file));
 
-      <input type="file" accept="image/*" onChange={uploadFile} />
+        const formData = new FormData();
+        formData.append("receipt", file);
 
-      {loading && <p>Parsing receipt...</p>}
+        setLoading(true);
 
-      {receipt && (
-        <div style={{ marginTop: 24 }}>
-          <label>Merchant</label>
-          <input
-            value={receipt.merchant}
-            onChange={(e) =>
-              setReceipt({ ...receipt, merchant: e.target.value })
-            }
-          />
+        const res = await fetch("http://localhost:3001/parse-receipt", {
+            method: "POST",
+            body: formData
+        });
 
-          <br /><br />
+        const data = await res.json();
 
-          <label>Date</label>
-          <input
-            value={receipt.date}
-            onChange={(e) =>
-              setReceipt({ ...receipt, date: e.target.value })
-            }
-          />
+        setReceipt(data);
 
-          <h3>Items</h3>
+        setLoading(false);
+    }
 
-          {receipt.items.map((item, idx) => (
-            <div key={idx}>
-              <input
-                value={item.name}
-                onChange={(e) =>
-                  updateItem(idx, "name", e.target.value)
+    async function saveReceipt() {
+        await fetch("http://localhost:3001/save-receipt", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(receipt)
+        });
+
+        await fetchReceipts();
+
+        setShowToast(true);
+
+        setTimeout(() => {
+            setShowToast(false);
+        }, 5000);
+
+        setReceipt(null);
+        setImagePreview(null);
+    }
+
+    function calculateTotal(items) {
+        return items.reduce(
+            (sum, item) => sum + Number(item.amount || 0),
+            0
+        );
+    }
+
+    function updateItem(index, key, value) {
+        const updated = { ...receipt };
+
+        updated.items[index][key] = value;
+
+        updated.total = calculateTotal(updated.items);
+
+        setReceipt(updated);
+    }
+
+    function addItem() {
+        const updated = {
+            ...receipt,
+            items: [
+                ...receipt.items,
+                {
+                    name: "",
+                    amount: 0
                 }
-              />
+            ]
+        };
 
-              <input
-                type="number"
-                value={item.amount}
-                onChange={(e) =>
-                  updateItem(idx, "amount", Number(e.target.value))
-                }
-              />
+        setReceipt(updated);
+    }
+
+    function removeItem(index) {
+        const updatedItems = receipt.items.filter(
+            (_, idx) => idx !== index
+        );
+
+        const updatedReceipt = {
+            ...receipt,
+            items: updatedItems,
+            total: calculateTotal(updatedItems)
+        };
+
+        setReceipt(updatedReceipt);
+    }
+
+    function renderReadOnlyReceipt(data) {
+        return (
+            <div className="readonly-card">
+                <h2>{data.merchant}</h2>
+
+                <p>
+                    <strong>Date:</strong> {data.date}
+                </p>
+
+                <h3>Items</h3>
+
+                {data.items.map((item, idx) => (
+                    <div key={idx} className="item-row">
+                        <span>{item.name}</span>
+                        <span>${Number(item.amount).toFixed(2)}</span>
+                    </div>
+                ))}
+
+                <hr />
+
+                <h3>Total: ${Number(data.total).toFixed(2)}</h3>
             </div>
-          ))}
+        );
+    }
 
-          <h3>Total</h3>
+    return (
+        <div className="page">
+            <div className="sidebar">
+                <h2>Saved Receipts</h2>
 
-          <input
-            type="number"
-            value={receipt.total}
-            onChange={(e) =>
-              setReceipt({
-                ...receipt,
-                total: Number(e.target.value)
-              })
-            }
-          />
+                {savedReceipts.length === 0 && (
+                    <p>No saved receipts yet.</p>
+                )}
 
-          <br /><br />
+                {savedReceipts.map((r, idx) => (
+                    <div
+                        key={idx}
+                        className="receipt-list-item"
+                        onClick={() => {
+                            if (receipt) return;
 
-          <button onClick={saveReceipt}>Save Receipt</button>
+                            setSelectedReceipt(r);
+                        }}
+                    >
+                        <strong>{r.merchant}</strong>
+
+                        <p>
+                            ${Number(r.total).toFixed(2)}
+                        </p>
+                    </div>
+                ))}
+            </div>
+
+            <div className="main">
+                <div className="hero-section">
+                    <div>
+                        <h1>Receipt Parser</h1>
+
+                        <p>
+                            Upload a receipt image and review
+                            extracted data before saving.
+                        </p>
+                    </div>
+
+                    <label className="upload-button">
+                        Choose Receipt
+                        <input
+                            type="file"
+                            accept="image/*"
+                            onChange={uploadFile}
+                            hidden
+                        />
+                    </label>
+                </div>
+
+                {loading && (
+                    <div className="loading-card">
+                        Parsing receipt...
+                    </div>
+                )}
+
+                {receipt && (
+                    <div className="card">
+                        <div className="image-container">
+                            {imagePreview && (
+                                <img
+                                    src={imagePreview}
+                                    alt="Receipt"
+                                    className="image"
+                                />
+                            )}
+                        </div>
+
+                        <div className="form-container">
+                            <label>Merchant</label>
+
+                            <input
+                                className="input"
+                                value={receipt.merchant}
+                                onChange={(e) =>
+                                    setReceipt({
+                                        ...receipt,
+                                        merchant:
+                                            e.target.value
+                                    })
+                                }
+                            />
+
+                            <label>Date</label>
+
+                            <input
+                                className="input"
+                                value={receipt.date}
+                                onChange={(e) =>
+                                    setReceipt({
+                                        ...receipt,
+                                        date: e.target.value
+                                    })
+                                }
+                            />
+
+                            <h3>Items</h3>
+
+                            {receipt.items.map((item, idx) => (
+                                <div
+                                    key={idx}
+                                    className="item-row"
+                                >
+                                    <input
+                                        className="item-input"
+                                        value={item.name}
+                                        placeholder="Item name"
+                                        onChange={(e) =>
+                                            updateItem(
+                                                idx,
+                                                "name",
+                                                e.target.value
+                                            )
+                                        }
+                                    />
+
+                                    <input
+                                        className="price-input"
+                                        type="number"
+                                        step="0.01"
+                                        value={item.amount}
+                                        onChange={(e) =>
+                                            updateItem(
+                                                idx,
+                                                "amount",
+                                                Number(
+                                                    e.target
+                                                        .value
+                                                )
+                                            )
+                                        }
+                                    />
+
+                                    <button
+                                        className="delete-button"
+                                        onClick={() =>
+                                            removeItem(idx)
+                                        }
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+
+                            <button
+                                className="secondary-button"
+                                onClick={addItem}
+                            >
+                                + Add Item
+                            </button>
+
+                            <h3>
+                                Total: $
+                                {Number(
+                                    receipt.total
+                                ).toFixed(2)}
+                            </h3>
+
+                            <button
+                                className="button"
+                                onClick={saveReceipt}
+                            >
+                                Save Receipt
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {!receipt && selectedReceipt && (
+                    <div style={{ marginTop: 24 }}>
+                        <h2>Saved Receipt</h2>
+
+                        {renderReadOnlyReceipt(
+                            selectedReceipt
+                        )}
+                    </div>
+                )}
+
+                {showToast && (
+                    <div className="toast">
+                        Receipt saved successfully
+                    </div>
+                )}
+
+            </div>
         </div>
-      )}
-    </div>
-  );
+    );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById("root")).render(
+    <App />
+);

@@ -98,7 +98,7 @@ The correction flow is intentionally central to the product experience. Users ca
 
 # Tradeoffs
 
-## 1. JSON File Persistence Instead of SQLite
+## 1. JSON File Persistence Instead of SQLite/MongoDB
 
 I chose JSON-file persistence to reduce setup complexity and keep the app runnable with minimal configuration. For the assignment scope, durability and querying requirements were limited.
 
@@ -114,10 +114,37 @@ I treated purchased products as line items while excluding taxes, subtotals, dis
 
 # LLM Usage
 
-* Used Google Gemini Vision API for OCR and structured extraction
-* Prompted the model to return strict JSON only
-* Added response cleanup for malformed markdown-wrapped JSON
-* Used manual correction UI as the primary recovery path for extraction mistakes
+I used ChatGPT extensively throughout the project as a development copilot rather than only for isolated code generation tasks.
+
+Specifically, I used it for:
+- initial project scaffolding and architecture iteration,
+- generating and refining the Gemini receipt-parsing prompt,
+- building the React receipt correction UI,
+- iterating on UX improvements such as:
+  - inline editing,
+  - auto-updating totals,
+  - add/remove line items,
+  - saved receipt history,
+  - read-only receipt previews,
+  - and toast notifications,
+- converting inline styles into a cleaner CSS structure,
+- debugging Gemini API integration issues and model compatibility problems,
+- discussing architectural tradeoffs between:
+  - separate Express backend vs full-stack Next.js,
+  - synchronous vs async parsing flows,
+  - and persistence approaches,
+
+I still made the final implementation and product decisions manually, especially around:
+- scoping,
+- correction workflow prioritization,
+- data model simplifications,
+- UX behavior,
+- and architecture choices,
+- debugging Gemini API integration issues and model compatibility problems,
+- brainstorming on architectural tradeoffs between:
+  - separate Express backend vs full-stack Next.js,
+  - synchronous vs async parsing flows,
+  - and persistence approaches.
 
 ---
 

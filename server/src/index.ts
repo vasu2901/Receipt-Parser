@@ -70,19 +70,13 @@ Schema:
             imagePart
         ]);
 
-        console.log(result)
-
         const text = result.response.text();
-
-        console.log(text)
 
         // Remove markdown fences if Gemini adds them
         const cleaned = text
             .replace(/```json/g, "")
             .replace(/```/g, "")
             .trim();
-
-        console.log(cleaned)
 
         const parsed = JSON.parse(cleaned);
 
